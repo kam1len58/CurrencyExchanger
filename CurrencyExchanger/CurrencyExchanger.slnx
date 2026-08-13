@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CurrencyExchanger.Domain/CurrencyExchanger.Domain.csproj" Id="38d22e65-d596-4d97-9789-5d5a6f7c9b4d" />
+  <Project Path="CurrencyExchanger/CurrencyExchanger.csproj" />
+</Solution>
