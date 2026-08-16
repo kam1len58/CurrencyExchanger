@@ -67,5 +67,3 @@ nunit-*.xml
 # Visual Studio cache
 *.sln.ide/
 
-# SQLite database files
-*.db

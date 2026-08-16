@@ -6,10 +6,7 @@ services:
     container_name: currency-exchanger
     user: "0:0"
     environment:
-      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
       - ASPNETCORE_ENVIRONMENT=Development
-    volumes:
-      - dbdata:/app/data
     restart: unless-stopped
 
   nginx:
@@ -25,6 +22,3 @@ services:
     depends_on:
       - currencyexchanger
     restart: unless-stopped
-
-volumes:
-  dbdata:
