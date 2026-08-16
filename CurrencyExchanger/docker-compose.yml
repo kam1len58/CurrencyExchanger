@@ -21,7 +21,7 @@ services:
     volumes:
       - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-      - ./client:/usr/share/nginx/html:ro      # ← твой фронтенд
+      - ./client:/usr/share/nginx/html:ro
     depends_on:
       - currencyexchanger
     restart: unless-stopped
