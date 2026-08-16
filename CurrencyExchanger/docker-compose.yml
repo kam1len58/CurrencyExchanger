@@ -2,10 +2,9 @@ services:
   currencyexchanger:
     build:
       context: .
-      dockerfile: CurrencyExchanger/Dockerfile
+      dockerfile: Dockerfile
     container_name: currency-exchanger
-    ports:
-      - "80:8080"
+    user: "0:0"
     environment:
       - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
       - ASPNETCORE_ENVIRONMENT=Development
@@ -13,6 +12,19 @@ services:
       - dbdata:/app/data
     restart: unless-stopped
 
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./client:/usr/share/nginx/html:ro      # ← твой фронтенд
+    depends_on:
+      - currencyexchanger
+    restart: unless-stopped
+
 volumes:
-  dbdata: 
-  
+  dbdata:
