@@ -1,10 +1,11 @@
 ﻿using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 
-namespace CurrencyExchanger.Dao;
+namespace CurrencyExchanger.DAL.Dao;
 
 public class DBConnectionProvider
 {
-    private string _connection;
+    private readonly string _connection;
 
     public DBConnectionProvider()
     {
@@ -13,8 +14,5 @@ public class DBConnectionProvider
             ?? throw new InvalidOperationException("Строка подключения 'DefaultConnection' не найдена в файле appsettings.json");
     }
 
-    public SqliteConnection GetConnection()
-    {
-        return new SqliteConnection(_connection);
-    }
+    public SqliteConnection GetConnection() => new SqliteConnection(_connection);
 }

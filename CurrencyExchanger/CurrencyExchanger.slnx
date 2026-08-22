@@ -1,4 +1,6 @@
 <Solution>
-  <Project Path="CurrencyExchanger.Domain/CurrencyExchanger.Domain.csproj" Id="38d22e65-d596-4d97-9789-5d5a6f7c9b4d" />
-  <Project Path="CurrencyExchanger/CurrencyExchanger.csproj" />
+  <Project Path="CurrencyExchanger.API/CurrencyExchanger.API.csproj" />
+  <Project Path="CurrencyExchanger.BLL/CurrencyExchanger.BLL.csproj" Id="b38ffe25-73bd-42a4-b83b-b43b89435864" />
+  <Project Path="CurrencyExchanger.DAL/CurrencyExchanger.DAL.csproj" Id="a498cb6f-4c59-4ce7-acd6-b34f474c095a" />
+  <Project Path="CurrencyExchanger.Models/CurrencyExchanger.Models.csproj" />
 </Solution>

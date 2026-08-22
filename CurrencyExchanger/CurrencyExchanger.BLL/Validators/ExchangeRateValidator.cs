@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace CurrencyExchanger.Domain.Validators;
+namespace CurrencyExchanger.BLL.Validators;
 
 public class ExchangeRateValidator
 {
@@ -10,24 +10,22 @@ public class ExchangeRateValidator
         ValidateRate(rate);
     }
 
-    public void ValidateCode(string baseCurrencyCode, string targetCurrencyCode)
+    private void ValidateCode(string baseCurrencyCode, string targetCurrencyCode)
     {
-        if (string.IsNullOrEmpty(baseCurrencyCode) || string.IsNullOrEmpty(targetCurrencyCode)
-           || !Regex.IsMatch(baseCurrencyCode, @"^[A-Z]{3}$") || !Regex.IsMatch(targetCurrencyCode, @"^[A-Z]{3}$"))
+        if (string.IsNullOrEmpty(baseCurrencyCode)
+            || string.IsNullOrEmpty(targetCurrencyCode)
+            || !Regex.IsMatch(baseCurrencyCode, @"^[A-Z]{3}$")
+            || !Regex.IsMatch(targetCurrencyCode, @"^[A-Z]{3}$"))
         {
             throw new ArgumentException("Некорректный код при добавлении обменного курса валют");
         }
     }
 
-    public void ValidateAmount(decimal? amount)
-    {
-        if(amount<=0)
-            throw new ArgumentException("Неверная сумма при конвертации валют");
-    }
-
     private void ValidateRate(decimal? rate)
     {
-        if (rate <= 0)
+        if (rate is null || rate <= 0)
+        {
             throw new ArgumentException("Некорректный курс при добавлении в базу данных");
+        }
     }
 }

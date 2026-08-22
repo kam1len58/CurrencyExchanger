@@ -1,5 +1,5 @@
 ﻿
-namespace CurrencyExchanger.Dto;
+namespace CurrencyExchanger.Models.Dto;
 
 public record ExchangeRateDto(int ID, CurrencyDto? BaseCurrency, CurrencyDto? TargetCurrency, decimal? Rate);
 

@@ -1,7 +1,6 @@
-using CurrencyExchanger;
-using CurrencyExchanger.Dao;
-using CurrencyExchanger.Domain;
-using CurrencyExchanger.Domain.Validators;
+using CurrencyExchanger.BLL;
+using CurrencyExchanger.BLL.Validators;
+using CurrencyExchanger.DAL.Dao;
 using Scalar.AspNetCore;
 using System.Globalization;
 
@@ -17,7 +16,8 @@ builder.Services.AddCors(options =>
                       policy =>
                       {
                           policy.WithOrigins("http://127.0.0.1:5500",
-                                              "http://localhost:5500")
+                                              "http://localhost:5500",
+                                              "https://currencyexchanger.duckdns.org/")
                           .WithMethods("GET", "PUT", "POST", "PATCH")
                           .AllowAnyHeader();
                       });
@@ -32,6 +32,7 @@ builder.Services.AddScoped<CurrencyDao>();
 builder.Services.AddScoped<ExchangeRateDao>();
 builder.Services.AddSingleton<CurrencyValidator>();
 builder.Services.AddSingleton<ExchangeRateValidator>();
+builder.Services.AddScoped<ExchangeService>();
 
 var app = builder.Build();
 
@@ -42,9 +43,10 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseCors(MyAllowSpecificOrigins);
 
 app.UseHttpsRedirection();
+
+app.UseCors(MyAllowSpecificOrigins);
 
 app.UseAuthorization();
 
