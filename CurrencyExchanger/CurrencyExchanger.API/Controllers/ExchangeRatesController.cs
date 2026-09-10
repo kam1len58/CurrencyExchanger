@@ -1,8 +1,9 @@
-﻿using CurrencyExchanger.BLL.Validators;
-using CurrencyExchanger.DAL.Dao;
-using CurrencyExchanger.DAL.Mappers;
+﻿using CurrencyExchanger.API.Exceptions;
+using CurrencyExchanger.API.Models.Requests;
+using CurrencyExchanger.API.Models.Responses;
+using CurrencyExchanger.BLL.Services;
+using CurrencyExchanger.BLL.Validators;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.Sqlite;
 
 namespace CurrencyExchanger.API.Controllers;
 
@@ -10,79 +11,188 @@ namespace CurrencyExchanger.API.Controllers;
 [Route("exchangeRates")]
 public class ExchangeRatesController(
     ExchangeRateValidator exchangeRateValidator,
-    ExchangeRateDao exchangeRateDao,
-    CurrencyDao currencyDao
+    ExchangeRateService exchangeRateService,
+    CurrencyService currencyService
 ) : ControllerBase
 {
     private readonly ExchangeRateValidator _exchangeRateValidator = exchangeRateValidator;
-    private readonly ExchangeRateDao _exchangeRateDao = exchangeRateDao;
-    private readonly CurrencyDao _currencyDao = currencyDao;
+    private readonly ExchangeRateService _exchangeRateService = exchangeRateService;
+    private readonly CurrencyService _currencyService = currencyService;
 
     [HttpGet]
     public async Task<ActionResult> GetExchangesRates()
     {
-        try
-        {
-            var exchangesRates = (await Task.WhenAll((await _exchangeRateDao
-                        .GetAllExchangeRatesAsync())
-                        .Select(async er =>
-                        {
-                            var baseCurrency = await _currencyDao.GetCurrencyByIdAsync(er.BaseCurrencyId);
-                            var targetCurrency = await _currencyDao.GetCurrencyByIdAsync(er.TargetCurrencyId);
 
-                            if (baseCurrency is null || targetCurrency is null)
-                            {
-                                throw new Exception("Валюта не найдена");
-                            }
+        var exchangesRates = (await Task.WhenAll((await _exchangeRateService
+            .GetAllExchangeRatesAsync())
+            .Select(async er =>
+            {
+                var baseCurrency = await _currencyService.GetCurrencyByIdAsync(er.BaseCurrencyId);
+                var targetCurrency = await _currencyService.GetCurrencyByIdAsync(er.TargetCurrencyId);
 
-                            return ExchangeRateMapper.ToDto(er, baseCurrency, targetCurrency);
-                        })))
-                        .ToList();
+                if (baseCurrency is null || targetCurrency is null)
+                    throw new NotFoundException("Валюта не найдена");
 
-            return Ok(exchangesRates);
-        }
-        catch (SqliteException)
-        {
-            return StatusCode(500, new { message = "База данных недоступна" });
-        }
+                var exchangeRateResponse = new ExchangeRateResponse
+                {
+                    Id = er.Id,
+                    BaseCurrency = new CurrencyResponse
+                    {
+                        Id = baseCurrency.Id,
+                        Name = baseCurrency.FullName,
+                        Code = baseCurrency.Code,
+                        Sign = baseCurrency.Sign
+                    },
+                    TargetCurrency = new CurrencyResponse
+                    {
+                        Id = targetCurrency.Id,
+                        Name = targetCurrency.FullName,
+                        Code = targetCurrency.Code,
+                        Sign = targetCurrency.Sign
+                    },
+                    Rate = er.Rate
+                };
+                return exchangeRateResponse;
+            })))
+            .ToList();
+
+        return Ok(exchangesRates);
     }
 
     [HttpPost]
-    public async Task<ActionResult> AddExchangeRate([FromForm] string baseCurrencyCode, [FromForm] string targetCurrencyCode, [FromForm] decimal? rate)
+    public async Task<ActionResult<ExchangeRateResponse>> AddExchangeRate([FromForm] ExchangeRateRequest request)
     {
-        try
+        var baseCurrencyCode = request.BaseCurrencyCode;
+        var targetCurrencyCode = request.TargetCurrencyCode;
+        var rate = request.Rate;
+
+        if (baseCurrencyCode is null || targetCurrencyCode is null || rate is null)
+            throw new BadRequestException("Отсутствует нужное поле формы");
+
+        var baseCurrency = await _currencyService.GetCurrencyByCodeAsync(baseCurrencyCode);
+        var targetCurrency = await _currencyService.GetCurrencyByCodeAsync(targetCurrencyCode);
+
+        if (baseCurrency is null || targetCurrency is null)
+            throw new NotFoundException("Данной валюты не существует");
+
+        var baseCurrencyId = baseCurrency.Id;
+        var targetCurrencyId = targetCurrency.Id;
+
+        if (await _exchangeRateService.IsExchangeRateExistsAsync(baseCurrencyId, targetCurrencyId))
+            throw new ConflictException("Такой обменный курс уже существует");
+
+        _exchangeRateValidator.ValidateParameters(baseCurrencyCode, targetCurrencyCode, rate);
+
+        var exchangeRate = await _exchangeRateService.AddExchangeRateAsync(baseCurrencyId, targetCurrencyId, rate);
+
+        if (exchangeRate is null)
+            throw new NotFoundException("Данной валюты не существует");
+
+        var exchangeRateResponse = new ExchangeRateResponse
         {
-            if (baseCurrencyCode is null || targetCurrencyCode is null || rate is null)
+            Id = exchangeRate.Value.ExchangeRate.Id,
+            BaseCurrency = new CurrencyResponse
             {
-                return BadRequest(new { message = "Отсутствует нужное поле формы" });
-            }
-
-            var baseCurrencyId = await _currencyDao.GetCurrencyIdByCodeAsync(baseCurrencyCode);
-            var targetCurrencyId = await _currencyDao.GetCurrencyIdByCodeAsync(targetCurrencyCode);
-
-            if (baseCurrencyId == 0 || targetCurrencyId == 0)
+                Id = baseCurrencyId,
+                Name = baseCurrency.FullName,
+                Code = baseCurrency.Code,
+                Sign = baseCurrency.Sign
+            },
+            TargetCurrency = new CurrencyResponse
             {
-                return NotFound(new { message = "Данной валюты не существует" });
-            }
+                Id = targetCurrencyId,
+                Name = targetCurrency.FullName,
+                Code = targetCurrency.Code,
+                Sign = targetCurrency.Sign
+            },
+            Rate = rate
+        };
 
-            if (await _exchangeRateDao.IsExchangeRateExistsAsync(baseCurrencyId, targetCurrencyId))
-            {
-                return Conflict(new { message = "Такой обменный курс уже существует" });
-            }
+        return CreatedAtAction(nameof(GetExchangesRates), exchangeRateResponse);
+    }
 
-            _exchangeRateValidator.ValidateParameters(baseCurrencyCode, targetCurrencyCode, rate);
+    [HttpGet("{pair}")]
+    public async Task<ActionResult<ExchangeRateResponse>> GetExchangeRate(string pair)
+    {
+        if (string.IsNullOrWhiteSpace(pair) || pair.Length != 6)
+            throw new BadRequestException("Коды валют пары отсутствуют в адресе");
 
-            var exchangeRate = await _exchangeRateDao.AddExchangeRateAsync(baseCurrencyId, targetCurrencyId, rate);
+        var exchangeRate = await _exchangeRateService.GetExchangeRateByCodeAsync(pair);
 
-            return CreatedAtAction(nameof(GetExchangesRates), exchangeRate);
-        }
-        catch (ArgumentException)
+        if (exchangeRate is null)
+            throw new NotFoundException("Обменный курс для пары не найден");
+
+        var baseCurrency = exchangeRate.Value.BaseCurrency;
+        var targetCurrency = exchangeRate.Value.TargetCurrency;
+
+        var exchangeRateResponse = new ExchangeRateResponse
         {
-            return BadRequest(new { message = "Отсутствует нужное поле формы" });
-        }
-        catch (SqliteException)
+            Id = exchangeRate.Value.ExchangeRate.Id,
+            BaseCurrency = new CurrencyResponse
+            {
+                Id = baseCurrency.Id,
+                Name = baseCurrency.FullName,
+                Code = baseCurrency.Code,
+                Sign = baseCurrency.Sign
+            },
+            TargetCurrency = new CurrencyResponse
+            {
+                Id = targetCurrency.Id,
+                Name = targetCurrency.FullName,
+                Code = targetCurrency.Code,
+                Sign = targetCurrency.Sign,
+            },
+            Rate = exchangeRate.Value.ExchangeRate.Rate
+        };
+
+        return Ok(exchangeRateResponse);
+    }
+
+    [HttpPatch("{pair}")]
+    public async Task<ActionResult<ExchangeRateResponse>> UpdateExchangeRate([FromRoute] string pair, [FromForm] UpdateExchangeRateRequest request)
+    {
+        var rate = request.Rate;
+
+        if (string.IsNullOrWhiteSpace(pair) || rate is null || pair.Length != 6)
+            throw new BadRequestException("Отсутствует нужное поле формы");
+
+        var baseCurrencyCode = pair.Substring(0, 3);
+        var targetCurrencyCode = pair.Substring(3, 3);
+        var baseCurrencyId = await _currencyService.GetCurrencyIdByCodeAsync(baseCurrencyCode);
+        var targetCurrencyId = await _currencyService.GetCurrencyIdByCodeAsync(targetCurrencyCode);
+
+        if (!(await _exchangeRateService.IsExchangeRateExistsAsync(baseCurrencyId, targetCurrencyId)))
+            throw new NotFoundException("Валютная пара отсутствует в базе данных");
+
+        _exchangeRateValidator.ValidateParameters(baseCurrencyCode, targetCurrencyCode, rate);
+        var exchangeRate = await _exchangeRateService.UpdateExchangeRateDtoAsync(pair, rate);
+
+        if (exchangeRate is null)
+            throw new NotFoundException("Валютная пара отсутствует в базе данных");
+
+        var baseCurrency = exchangeRate.Value.BaseCurrency;
+        var targetCurrency = exchangeRate.Value.TargetCurrency;
+
+        var exchangeRateResponse = new ExchangeRateResponse
         {
-            return StatusCode(500, "Не получилось добавить обменный курс в базу данных");
-        }
+            Id = exchangeRate.Value.ExchangeRate.Id,
+            BaseCurrency = new CurrencyResponse
+            {
+                Id = baseCurrency.Id,
+                Name = baseCurrency.FullName,
+                Code = baseCurrency.Code,
+                Sign = baseCurrency.Sign
+            },
+            TargetCurrency = new CurrencyResponse
+            {
+                Id = targetCurrency.Id,
+                Name = targetCurrency.FullName,
+                Code = targetCurrency.Code,
+                Sign = targetCurrency.Sign
+            },
+            Rate = exchangeRate.Value.ExchangeRate.Rate
+        };
+
+        return Ok(exchangeRateResponse);
     }
 }

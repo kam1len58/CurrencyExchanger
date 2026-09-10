@@ -16,16 +16,12 @@ public class ExchangeRateValidator
             || string.IsNullOrEmpty(targetCurrencyCode)
             || !Regex.IsMatch(baseCurrencyCode, @"^[A-Z]{3}$")
             || !Regex.IsMatch(targetCurrencyCode, @"^[A-Z]{3}$"))
-        {
             throw new ArgumentException("Некорректный код при добавлении обменного курса валют");
-        }
     }
 
     private void ValidateRate(decimal? rate)
     {
         if (rate is null || rate <= 0)
-        {
             throw new ArgumentException("Некорректный курс при добавлении в базу данных");
-        }
     }
 }

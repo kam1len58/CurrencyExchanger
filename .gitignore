@@ -67,3 +67,5 @@ nunit-*.xml
 # Visual Studio cache
 *.sln.ide/
 
+# SQLiteBrowser project files
+*.sqbpro

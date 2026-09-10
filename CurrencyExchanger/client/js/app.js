@@ -135,7 +135,7 @@ $(document).ready(function () {
 
         // send values to the server with a patch request
         $.ajax({
-            url: `${host}/exchangeRate/${pair}`,
+            url: `${host}/exchangeRates/${pair}`,
             type: "PATCH",
             contentType: "application/x-www-form-urlencoded",
             data: `rate=${exchangeRate}`,
@@ -187,7 +187,7 @@ $(document).ready(function () {
         const amount = $("#convert-amount").val();
 
         $.ajax({
-            url: `${host}/exchangeRate/exchange?from=${baseCurrency}&to=${targetCurrency}&amount=${amount}`,
+            url: `${host}/exchange?from=${baseCurrency}&to=${targetCurrency}&amount=${amount}`,
             type: "GET",
             // data: "$("#add-exchange-rate").serialize()",
             success: function (data) {
