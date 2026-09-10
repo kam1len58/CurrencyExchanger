@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CurrencyExchanger.BLL\CurrencyExchanger.BLL.csproj" />
-    <ProjectReference Include="..\CurrencyExchanger.DAL\CurrencyExchanger.DAL.csproj" />
     <ProjectReference Include="..\CurrencyExchanger.Models\CurrencyExchanger.Models.csproj" />
   </ItemGroup>
 

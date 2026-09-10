@@ -1,6 +1,4 @@
-﻿using CurrencyExchanger.DAL.Mappers;
-using CurrencyExchanger.Models;
-using CurrencyExchanger.Models.Dto;
+﻿using CurrencyExchanger.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CurrencyExchanger.DAL.Dao;
@@ -14,10 +12,10 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
     {
         var exchangeRates = new List<ExchangeRate>();
         using var connection = _connectionProvider.GetConnection();
-
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT * FROM ExchangeRates", connection);
+        var query = "SELECT * FROM ExchangeRates";
+        using var command = new SqliteCommand(query, connection);
         using var dataReader = await command.ExecuteReaderAsync();
 
         while (await dataReader.ReadAsync())
@@ -35,7 +33,7 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
         return exchangeRates;
     }
 
-    public async Task<ExchangeRateDto?> GetExchangeRateByCodeAsync(string pair)
+    public async Task<(ExchangeRate ExchangeRate, Currency BaseCurrency, Currency TargetCurrency)?> GetExchangeRateByCodeAsync(string pair)
     {
         string baseCurrencyCode = pair.Substring(0, 3);
         string targetCurrencyCode = pair.Substring(3, 3);
@@ -44,30 +42,31 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
         var targetCurrency = await _currencyDao.GetCurrencyByCodeAsync(targetCurrencyCode);
 
         if (baseCurrency is null || targetCurrency is null)
-        {
             return null;
-        }
 
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT * FROM ExchangeRates " +
-            "JOIN Currencies AS BaseCurrency ON ExchangeRates.BaseCurrencyId = BaseCurrency.ID " +
-            "JOIN Currencies AS TargetCurrency ON ExchangeRates.TargetCurrencyId = TargetCurrency.ID " +
-            "WHERE BaseCurrency.Code = @baseCurrencyCode AND TargetCurrency.Code = @targetCurrencyCode", connection);
-
+        var query = """
+            SELECT *
+            FROM ExchangeRates
+            	JOIN Currencies AS BaseCurrency ON ExchangeRates.BaseCurrencyId = BaseCurrency.ID
+            	JOIN Currencies AS TargetCurrency ON ExchangeRates.TargetCurrencyId = TargetCurrency.ID
+            WHERE BaseCurrency.Code = @baseCurrencyCode
+            	AND TargetCurrency.Code = @targetCurrencyCode
+            """;
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@baseCurrencyCode", baseCurrencyCode);
         command.Parameters.AddWithValue("@targetCurrencyCode", targetCurrencyCode);
-
         using var dataReader = await command.ExecuteReaderAsync();
 
         if (await dataReader.ReadAsync())
         {
-            return ExchangeRateMapper.ToDto(
+            return (
                 new ExchangeRate(
                     dataReader.GetInt32(0),
-                    baseCurrency.ID,
-                    targetCurrency.ID,
+                    baseCurrency.Id,
+                    targetCurrency.Id,
                     dataReader.GetDecimal(3)
                 ),
                 baseCurrency,
@@ -78,29 +77,30 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
         return null;
     }
 
-    public async Task<ExchangeRateDto?> AddExchangeRateAsync(int? baseCurrencyId, int? targetCurrencyId, decimal? rate)
+    public async Task<(ExchangeRate ExchangeRate, Currency BaseCurrency, Currency TargetCurrency)?> AddExchangeRateAsync(int? baseCurrencyId, int? targetCurrencyId, decimal? rate)
     {
         var baseCurrency = await _currencyDao.GetCurrencyByIdAsync(baseCurrencyId);
         var targetCurrency = await _currencyDao.GetCurrencyByIdAsync(targetCurrencyId);
 
         if (baseCurrency is null || targetCurrency is null)
-        {
             return null;
-        }
 
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("INSERT INTO ExchangeRates (BaseCurrencyId, TargetCurrencyId, Rate) VALUES (@baseCurrencyId, @targetCurrencyId, @rate);" +
-            "SELECT last_insert_rowid();", connection);
+        var query = """
+            INSERT INTO ExchangeRates (BaseCurrencyId, TargetCurrencyId, Rate)
+            VALUES (@baseCurrencyId, @targetCurrencyId, @rate);
 
+            SELECT last_insert_rowid();
+            """;
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@baseCurrencyId", baseCurrencyId);
         command.Parameters.AddWithValue("@targetCurrencyId", targetCurrencyId);
         command.Parameters.AddWithValue("@rate", rate);
-
         int lastId = Convert.ToInt32(await command.ExecuteScalarAsync());
 
-        return ExchangeRateMapper.ToDto(
+        return (
             new ExchangeRate(
                 lastId,
                 baseCurrencyId,
@@ -115,20 +115,17 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
     public async Task<bool> IsExchangeRateExistsAsync(int? baseCurrencyId, int? targetCurrencyId)
     {
         using var connection = _connectionProvider.GetConnection();
-
         await connection.OpenAsync();
 
         using var command = new SqliteCommand("SELECT * FROM ExchangeRates WHERE BaseCurrencyId = @baseCurrencyId AND TargetCurrencyId = @targetCurrencyId", connection);
-
         command.Parameters.AddWithValue("@baseCurrencyId", baseCurrencyId);
         command.Parameters.AddWithValue("@targetCurrencyId", targetCurrencyId);
-
         using var dataReader = await command.ExecuteReaderAsync();
 
         return await dataReader.ReadAsync();
     }
 
-    public async Task<ExchangeRateDto?> UpdateExchangeRateDtoAsync(string pair, decimal? rate)
+    public async Task<(ExchangeRate ExchangeRate, Currency BaseCurrency, Currency TargetCurrency)?> UpdateExchangeRateDtoAsync(string pair, decimal? rate)
     {
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
@@ -138,13 +135,23 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
         var baseCurrencyId = await _currencyDao.GetCurrencyIdByCodeAsync(baseCurrencyCode);
         var targetCurrencyId = await _currencyDao.GetCurrencyIdByCodeAsync(targetCurrencyCode);
 
-        using var command = new SqliteCommand("UPDATE ExchangeRates SET Rate = @rate WHERE BaseCurrencyId = @baseCurrencyId AND TargetCurrencyId = @targetCurrencyId;" +
-            "SELECT ID, BaseCurrencyId, TargetCurrencyId FROM ExchangeRates WHERE BaseCurrencyId = @baseCurrencyId AND TargetCurrencyId = @targetCurrencyId;", connection);
+        var query = """
+            UPDATE ExchangeRates
+            SET Rate = @rate
+            WHERE BaseCurrencyId = @baseCurrencyId
+            	AND TargetCurrencyId = @targetCurrencyId;
 
+            SELECT ID,
+            	BaseCurrencyId,
+            	TargetCurrencyId
+            FROM ExchangeRates
+            WHERE BaseCurrencyId = @baseCurrencyId
+            	AND TargetCurrencyId = @targetCurrencyId;
+            """;
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@rate", rate);
         command.Parameters.AddWithValue("@baseCurrencyId", baseCurrencyId);
         command.Parameters.AddWithValue("@targetCurrencyId", targetCurrencyId);
-
         using var dataReader = await command.ExecuteReaderAsync();
 
         if (await dataReader.ReadAsync())
@@ -153,15 +160,13 @@ public class ExchangeRateDao(DBConnectionProvider connectionProvider, CurrencyDa
             var targetCurrency = await _currencyDao.GetCurrencyByIdAsync(dataReader.GetInt32(2));
 
             if (baseCurrency is null || targetCurrency is null)
-            {
                 return null;
-            }
 
-            return ExchangeRateMapper.ToDto(
+            return (
                 new ExchangeRate(
                     dataReader.GetInt32(0),
-                    baseCurrency.ID,
-                    targetCurrency.ID,
+                    baseCurrency.Id,
+                    targetCurrency.Id,
                     rate
                 ),
                 baseCurrency,

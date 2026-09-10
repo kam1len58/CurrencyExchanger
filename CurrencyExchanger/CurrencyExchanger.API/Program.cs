@@ -1,14 +1,23 @@
-using CurrencyExchanger.BLL;
-using CurrencyExchanger.BLL.Validators;
-using CurrencyExchanger.DAL.Dao;
+using CurrencyExchanger.API.Extensions;
+using CurrencyExchanger.API.Middleware;
+using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
 using System.Globalization;
+
 
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Строка подключения 'DefaultConnection' не найдена в файле appsettings.json");
 
 builder.Services.AddCors(options =>
 {
@@ -27,14 +36,12 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-builder.Services.AddSingleton<DBConnectionProvider>();
-builder.Services.AddScoped<CurrencyDao>();
-builder.Services.AddScoped<ExchangeRateDao>();
-builder.Services.AddSingleton<CurrencyValidator>();
-builder.Services.AddSingleton<ExchangeRateValidator>();
-builder.Services.AddScoped<ExchangeService>();
+builder.Services.AddDataAccess(connectionString);
+builder.Services.AddBusinessLogic();
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

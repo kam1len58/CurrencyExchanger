@@ -1,63 +1,80 @@
+using CurrencyExchanger.API.Exceptions;
+using CurrencyExchanger.API.Models.Requests;
+using CurrencyExchanger.API.Models.Responses;
+using CurrencyExchanger.BLL.Services;
 using CurrencyExchanger.BLL.Validators;
-using CurrencyExchanger.DAL.Dao;
-using CurrencyExchanger.DAL.Mappers;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.Sqlite;
 
 namespace CurrencyExchanger.API.Controllers;
 
 [ApiController]
 [Route("currencies")]
-public class CurrenciesController(CurrencyValidator currencyValidator, CurrencyDao currencyDao) : ControllerBase
+public class CurrenciesController(CurrencyValidator currencyValidator, CurrencyService currencyService) : ControllerBase
 {
     private readonly CurrencyValidator _currencyValidator = currencyValidator;
-    private readonly CurrencyDao _currencyDao = currencyDao;
+    private readonly CurrencyService _currencyService = currencyService;
 
     [HttpGet]
     public async Task<ActionResult> GetCurrencies()
     {
-        try
-        {
-            var currencies = (await _currencyDao.GetAllCurrenciesAsync())
-                .Select(CurrencyMapper.ToDto)
-                .ToList();
+        var currencies = (await _currencyService.GetAllCurrenciesAsync())
+            .Select(c => new CurrencyResponse
+            {
+                Id = c.Id,
+                Name = c.FullName,
+                Code = c.Code,
+                Sign = c.Sign,
+            })
+            .ToList();
 
-            return Ok(currencies);
-        }
-        catch (SqliteException)
-        {
-            return StatusCode(500, new { message = "База данных недоступна" });
-        }
+        return Ok(currencies);
     }
 
     [HttpPost]
-    public async Task<ActionResult> AddCurrency([FromForm] string code, [FromForm] string name, [FromForm] string sign)
+    public async Task<ActionResult<CurrencyResponse>> AddCurrency([FromForm] CurrencyRequest currencyRequest)
     {
-        try
-        {
-            if (code is null || name is null || sign is null)
-            {
-                return BadRequest(new { message = "Отсутствует нужное поле формы" });
-            }
+        var code = currencyRequest.Code;
+        var name = currencyRequest.Name;
+        var sign = currencyRequest.Sign;
 
-            if (await _currencyDao.IsCurrencyExistsAsync(code))
-            {
-                return Conflict(new { message = "Валюта с таким кодом уже существует в базе данных" });
-            }
+        if (code is null || name is null || sign is null)
+            throw new BadRequestException("Отсутствует нужное поле формы");
 
-            _currencyValidator.ValidateCurrencyParameters(code, name, sign);
-            var currency = await _currencyDao.AddCurrencyAsync(name, code, sign);
-            var currencyDto = CurrencyMapper.ToDto(currency);
+        if (await _currencyService.IsCurrencyExistsAsync(code))
+            throw new ConflictException("Валюта с таким кодом уже существует в базе данных");
 
-            return CreatedAtAction(nameof(GetCurrencies), new { code = currencyDto.Code }, currencyDto);
-        }
-        catch (ArgumentException)
+        _currencyValidator.ValidateCurrencyParameters(code, name, sign);
+        var currency = await _currencyService.AddCurrencyAsync(name, code, sign);
+        var currencyResponse = new CurrencyResponse
         {
-            return BadRequest(new { message = "Отсутствует нужное поле формы" });
-        }
-        catch (SqliteException)
+            Id = currency.Id,
+            Name = currency.FullName,
+            Code = currency.Code,
+            Sign = currency.Sign
+        };
+
+        return CreatedAtAction(nameof(GetCurrencies), new { code = currencyResponse.Code }, currencyResponse);
+    }
+
+    [HttpGet("{code}")]
+    public async Task<ActionResult<CurrencyResponse>> GetCurrency(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new BadRequestException("Код валюты отсутствует в адресе");
+
+        var currency = await _currencyService.GetCurrencyByCodeAsync(code);
+
+        if (currency is null)
+            throw new NotFoundException("Валюта не найдена");
+
+        var currencyResponse = new CurrencyResponse
         {
-            return StatusCode(500, new { message = "База данных недоступна" });
-        }
+            Id = currency.Id,
+            Name = currency.FullName,
+            Code = currency.Code,
+            Sign = currency.Sign
+        };
+
+        return Ok(currencyResponse);
     }
 }

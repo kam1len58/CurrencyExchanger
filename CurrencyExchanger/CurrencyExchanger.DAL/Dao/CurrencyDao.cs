@@ -10,12 +10,11 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
     public async Task<List<Currency>> GetAllCurrenciesAsync()
     {
         var currencies = new List<Currency>();
-
         using var connection = _connectionProvider.GetConnection();
-
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT * FROM Currencies", connection);
+        var query = "SELECT * FROM Currencies";
+        using var command = new SqliteCommand(query, connection);
         using var dataReader = await command.ExecuteReaderAsync();
 
         while (await dataReader.ReadAsync())
@@ -38,7 +37,8 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT * FROM Currencies WHERE ID=@id", connection);
+        var query = "SELECT * FROM Currencies WHERE ID=@id";
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@id", id);
         using var dataReader = await command.ExecuteReaderAsync();
 
@@ -60,7 +60,8 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT * FROM Currencies WHERE CODE=@code", connection);
+        var query = "SELECT * FROM Currencies WHERE CODE=@code";
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@code", code);
         using var dataReader = await command.ExecuteReaderAsync();
 
@@ -82,10 +83,12 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("SELECT ID FROM Currencies WHERE CODE=@code", connection);
+        var query = "SELECT ID FROM Currencies WHERE CODE=@code";
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@code", code);
         using var dataReader = await command.ExecuteReaderAsync();
         int? currency = await dataReader.ReadAsync() ? dataReader.GetInt32(0) : null;
+
         return currency;
     }
 
@@ -94,12 +97,16 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
         using var connection = _connectionProvider.GetConnection();
         await connection.OpenAsync();
 
-        using var command = new SqliteCommand("INSERT INTO Currencies (Code, FullName, Sign) VALUES (@code, @name, @sign);" +
-            "SELECT last_insert_rowid();", connection);
+        var query = """
+            INSERT INTO Currencies (Code, FullName, SIGN)
+            VALUES (@code, @name, @sign);
+
+            SELECT LAST_INSERT_ROWID();
+            """;
+        using var command = new SqliteCommand(query, connection);
         command.Parameters.AddWithValue("@name", name);
         command.Parameters.AddWithValue("@code", code);
         command.Parameters.AddWithValue("@sign", sign);
-
         int lastId = Convert.ToInt32(await command.ExecuteScalarAsync());
 
         return new Currency(lastId, code, name, sign);
@@ -112,7 +119,6 @@ public class CurrencyDao(DBConnectionProvider connectionProvider)
 
         using var command = new SqliteCommand("SELECT * FROM Currencies WHERE CODE=@code", connection);
         command.Parameters.AddWithValue("@code", code);
-
         using var dataReader = await command.ExecuteReaderAsync();
 
         return await dataReader.ReadAsync();
