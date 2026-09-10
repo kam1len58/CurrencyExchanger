@@ -1,10 +1,13 @@
 # **Проект “Обмен валют”**
 
 ## Описание проекта
-REST API для описания валют и обменных курсов. Позволяет просматривать и редактировать списки валют и обменных курсов, и совершать расчёт конвертации произвольных сумм из одной валюты в другую. Приложение доступно по адресу: https://currencyexchanger.duckdns.org/.
+REST API для описания валют и обменных курсов. Позволяет просматривать и редактировать списки валют и обменных курсов, и совершать расчёт конвертации произвольных сумм из одной валюты в другую. 
 
 Подробное техническое задание доступно по ссылке:  
 [ТЗ проекта](https://zhukovsd.github.io/java-backend-learning-course/projects/currency-exchange/)
+
+## Ссылка на приложение
+Приложение доступно по адресу: https://currencyexchanger.duckdns.org/.
 
 ---
 
@@ -12,9 +15,13 @@ REST API для описания валют и обменных курсов. П
 
 *   **ASP.NET Core WebApi**
 *   **REST API**
+*   **Scalar UI** (документация API):
+    * VPS: [https://currencyexchanger.duckdns.org/scalar](https://currencyexchanger.duckdns.org/scalar)
+    * Локально: [http://localhost:7288/scalar](http://localhost:7288/scalar) *(порт можно изменить в файле `Properties/launchSettings.json`)*
 *   **SQLite**
 *   **Docker**
 *   **Deploy in VPS (Ubuntu 24.04)**
+    
 
 ---
 
